@@ -1,4 +1,11 @@
 import numpy as np
+import os
+
+def makedir_to(file_path):
+    file_name = os.path.basename(file_path)
+    path = file_path[:len(file_name)]
+    if not os.path.exists(path):
+        os.makedirs(path)
 
 
 def trim_nan_rows(data):

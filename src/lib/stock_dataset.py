@@ -95,6 +95,8 @@ class StockDataset:
         end_train_time = self.X.index[-1] - test_time - valid_time
         end_valid_time = self.X.index[-1] - test_time
 
+        assert end_train_time > self.X.index[0], "No training data. All data selected for validation and testing"
+
         train_X = self.X[:end_train_time]
         train_y = self.y[:end_train_time]
         
@@ -130,12 +132,19 @@ class StockDataset:
         return self.swap_data(new_X)
 
 
-    def get_batchable_index(self):
-        batchable_index = np.arange(self.n_time_steps, len(self.X))           
+    def get_batchable_index(self, trade_market_open=True):
+        batchable_index = np.arange(self.n_time_steps, len(self.X))
+        if not trade_market_open:
+            def during_market_open(time):
+                seconds = time.hour * 60**2 + time.minute * 60
+                return seconds > 9 * 60**2 + 30 * 60 + self.n_time_steps
+            bool_index = self.X.index.apply(during_market_open)
+            batchable_index = np.where(bool_index)[0]
+
         return batchable_index
 
 
-    def get_batch(self, batch_size, int_index, replace=True, shuffle=True):
+    def get_batch(self, batch_size, int_index, shuffle=True, replace=True):
         n_features = len(self.X.columns)
         n_symbols = len(self.y.columns)
         X_batch = np.zeros((batch_size, self.n_time_steps, n_features))
@@ -144,7 +153,8 @@ class StockDataset:
         if shuffle:
             inds = np.random.choice(int_index, batch_size, replace=replace)
         else:
-            inds = int_index
+            start_ind = np.random.randint(0, len(int_index)-batch_size+1)
+            inds = int_index[start_ind:start_ind+batch_size]
             
         for i, random_index in enumerate(inds):
             X_sample = self.X.iloc[random_index - self.n_time_steps: random_index]
@@ -154,6 +164,34 @@ class StockDataset:
         
         return X_batch, y_batch
     
+
+    def get_paired_batch(self, batch_size, int_index, shuffle=True, replace=True):
+        n_features = len(self.X.columns)
+        n_symbols = len(self.y.columns)
+        X_batch = np.zeros((batch_size, 2, self.n_time_steps, n_features))
+        y_batch = np.zeros((batch_size, 2, n_symbols))
+
+        if shuffle:
+            inds = np.random.choice(int_index[:-1], batch_size, replace=replace)
+        else:
+            start_ind = np.random.randint(0, len(int_index[:-1])-batch_size+1)
+            inds = int_index[start_ind:start_ind+batch_size]
+        
+        inds_final = inds + 1
+        
+        for i, random_index in enumerate(inds):
+            X_sample = self.X.iloc[random_index - self.n_time_steps: random_index]
+            y_sample = self.y.iloc[random_index - 1]
+            X_batch[i, 0, :] = X_sample
+            y_batch[i, 0] = y_sample
+        
+        for i, random_index in enumerate(inds_final):
+            X_sample = self.X.iloc[random_index - self.n_time_steps: random_index]
+            y_sample = self.y.iloc[random_index - 1]
+            X_batch[i, 1, :] = X_sample
+            y_batch[i, 1] = y_sample
+        
+        return X_batch, y_batch
 
     def __len__(self):
         return len(self.X)

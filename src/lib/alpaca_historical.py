@@ -4,8 +4,9 @@ import pytz
 import json
 import pandas as pd
 import pytz
+from tqdm import tqdm
 
-class Alpaca_Data():
+class AlpacaData():
     def __init__(self, keys_file_name):
         with open(keys_file_name, "r") as keys_file:
             keys = json.load(keys_file)
@@ -45,6 +46,10 @@ class Alpaca_Data():
         true_df = pd.DataFrame(columns=columns)
         complete = False
         page = None
+
+        # Progress bar
+        pbar = tqdm(total=100)
+        last_p_complete = 0
         while not complete:
             # Structure the payload
             payload = {
@@ -87,10 +92,15 @@ class Alpaca_Data():
             # Handle logging of last trade and percentage completed.
             if logs and last_trade_time:
                 diff = total_seconds-(end-last_trade_time).total_seconds()
-                perc_completed = str(round((diff/total_seconds)*100, 2)) + "%"
-                print(last_trade_time, perc_completed)
+                p_complete = round((diff/total_seconds)*100, 2)
+                pbar.update(p_complete - last_p_complete)
+                last_p_complete = p_complete
+                pbar.set_description(str(last_trade_time))
+                # print(last_trade_time, perc_completed)
         true_df.index = pd.to_datetime(true_df["time"])
         true_df.drop("time", inplace=True, axis=1)
+
+        pbar.close()
         return true_df
 
     # These three are pretty self explanitory
