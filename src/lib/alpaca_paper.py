@@ -73,16 +73,18 @@ class AlpacaTrader():
                         current_holdings_raw[key] = float(self.get_current_price(key).json()["latestQuote"]["ap"]) * float(order["qty"])
             if key in current_holdings_raw:
                 symbol_amount = (total_value*dersired_holdings[key]) - current_holdings_raw[key]
+                share_price = float(self.get_current_price(key).json()["latestQuote"]["ap"])
+                share_qty = round(symbol_amount/share_price)
                 if symbol_amount > 0:
-                    responses.append(self.place_dollar_order(key, symbol_amount, "buy", verbose=verbose))
+                    responses.append(self.place_market_order(key, share_qty, "buy", verbose=verbose))
                 elif symbol_amount < 0:
-                    responses.append(self.place_dollar_order(key, abs(symbol_amount), "sell", verbose=verbose))
+                    responses.append(self.place_market_order(key, abs(share_qty), "sell", verbose=verbose))
             else:
                 symbol_amount = total_value*dersired_holdings[key]
                 if symbol_amount > 0:
-                    responses.append(self.place_dollar_order(key, symbol_amount, "buy", verbose=verbose))
+                    responses.append(self.place_market_order(key, share_qty, "buy", verbose=verbose))
                 elif symbol_amount < 0:
-                    responses.append(self.place_dollar_order(key, abs(symbol_amount), "sell", verbose=verbose))
+                    responses.append(self.place_market_order(key, abs(share_qty), "sell", verbose=verbose))
         return responses
 
     def place_dollar_order(self, symbol, amount, side, verbose=False):
