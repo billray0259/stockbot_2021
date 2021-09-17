@@ -68,7 +68,8 @@ class AlpacaData():
             if datatype == 'bars':
                 payload['timeframe'] = timeframe
             # Send a data request
-            response = requests.get(url, headers=self.headers, json=payload)
+            print(payload)
+            response = requests.get(url, headers=self.headers, params=payload)
             if response.status_code != 200:
                 return "Failed to get data, status code %d, content, %s" % (response.status_code, response.content)
             a_data = response.json()
