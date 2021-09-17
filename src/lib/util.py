@@ -2,8 +2,14 @@ import numpy as np
 import os
 
 def makedir_to(file_path):
+    """ Given a file path, any non-existant directories to that file
+    * Expects the file path to end in a file not a directory
+
+    Args:
+        file_path (str): Potentially non-existant file path to create
+    """
     file_name = os.path.basename(file_path)
-    path = file_path[:len(file_name)]
+    path = file_path[:-len(file_name)]
     if not os.path.exists(path):
         os.makedirs(path)
 

@@ -50,10 +50,14 @@ class StockDataset:
             history_datas.append(history.data)
         
         concatenated = pd.concat(history_datas, axis=1)
-        self.X = trim_nan_rows(concatenated)
-        self.y = self.X[self.target_columns][1:]
-        self.X = self.X[:-1]
+        self.data = trim_nan_rows(concatenated)
+        self.y = self.data[self.target_columns][1:]
+        self.X = self.data[:-1]
         self.y.index = self.X.index
+    
+    
+    def prediction_X(self, n_time_steps):
+        return self.data[-n_time_steps:].to_numpy()[np.newaxis, :, :]
 
 
     def __deepcopy__(self, memo):
@@ -117,7 +121,7 @@ class StockDataset:
             valid = valid.apply_standard_scaler(scaler)
             test = test.apply_standard_scaler(scaler)
         
-        return train, valid, test
+        return train, valid, test, scaler
 
 
     def fit_standard_scaler(self):

@@ -78,6 +78,8 @@ class PriceHistory:
 
     def __init__(self, data, symbol):
         self.data = data
+        self.start_date = data.index[0]
+        self.end_date = data.index[-1]
         self.symbol = symbol
     
 
@@ -113,7 +115,7 @@ class PriceHistory:
 
         schedule = nyse.schedule(start_date=start_date, end_date=end_date)
         date_range = mcal.date_range(schedule, frequency="1T")
-        market_hours = self.data.reindex(date_range)
+        market_hours = self.data.reindex(date_range)[self.start_date: self.end_date]
         return PriceHistory(market_hours, self.symbol).trim_nan_rows()
     
     

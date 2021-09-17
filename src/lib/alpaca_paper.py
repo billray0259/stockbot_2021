@@ -1,5 +1,5 @@
 import json
-from os import P_OVERLAY
+# from os import P_OVERLAY
 import pytz
 import datetime as dt
 import requests
@@ -8,7 +8,7 @@ from requests.models import Response
 
 est = pytz.timezone('US/Eastern')
 
-class Alpaca_Trader():
+class AlpacaTrader():
     def __init__(self, keys_file_name, is_paper):
         with open(keys_file_name, "r") as keys_file:
             keys = json.load(keys_file)
@@ -50,7 +50,7 @@ class Alpaca_Trader():
             holdings["cash"] = cash_amount/total_value
         return holdings, total_value
 
-    def update_holdings(self, dersired_holdings, cancel_orders=True):
+    def update_holdings(self, dersired_holdings, cancel_orders=True, verbose=False):
         current_holdings_raw, total_value = self.get_holdings(raw=True, total_value=True)
         responses = []
         orders = self.get_orders().json()
@@ -74,18 +74,20 @@ class Alpaca_Trader():
             if key in current_holdings_raw:
                 symbol_amount = (total_value*dersired_holdings[key]) - current_holdings_raw[key]
                 if symbol_amount > 0:
-                    responses.append(self.place_dollar_order(key, symbol_amount, "buy"))
+                    responses.append(self.place_dollar_order(key, symbol_amount, "buy", verbose=verbose))
                 elif symbol_amount < 0:
-                    responses.append(self.place_dollar_order(key, abs(symbol_amount), "sell"))
+                    responses.append(self.place_dollar_order(key, abs(symbol_amount), "sell", verbose=verbose))
             else:
                 symbol_amount = total_value*dersired_holdings[key]
                 if symbol_amount > 0:
-                    responses.append(self.place_dollar_order(key, symbol_amount, "buy"))
+                    responses.append(self.place_dollar_order(key, symbol_amount, "buy", verbose=verbose))
                 elif symbol_amount < 0:
-                    responses.append(self.place_dollar_order(key, abs(symbol_amount), "sell"))
+                    responses.append(self.place_dollar_order(key, abs(symbol_amount), "sell", verbose=verbose))
         return responses
 
-    def place_dollar_order(self, symbol, amount, side):
+    def place_dollar_order(self, symbol, amount, side, verbose=False):
+        if verbose:
+            print(side, symbol, amount)
         payload = {
             "symbol": symbol,
             "notional": str(amount),    
@@ -93,7 +95,6 @@ class Alpaca_Trader():
             "type": "market",
             "time_in_force": "day"
         }
-        print(payload)
         return requests.post(self.endpoint+"/v2/orders", headers=self.headers, json=payload)
 
     def get_orders(self, status="all", symbols=None, limit=100, after=None, until=None, direction="desc", nested=True):
@@ -113,10 +114,12 @@ class Alpaca_Trader():
             payload["symbols"] = symbols
         return requests.get(self.endpoint+"/v2/orders", headers=self.headers, json=payload)
 
-    def place_market_order(self, symbol, quantity, side, time_in_force="day"):
+    def place_market_order(self, symbol, quantity, side, time_in_force="day", verbose=False):
+        if verbose:
+            print(side, symbol, quantity)
         payload = {
             "symbol": symbol,
-            "qty": str(quantity),    
+            "qty": str(quantity),
             "side": side,
             "type": "market",
             "time_in_force": time_in_force

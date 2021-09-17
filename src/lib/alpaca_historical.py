@@ -5,6 +5,7 @@ import json
 import pandas as pd
 import pytz
 from tqdm import tqdm
+from dateutil import parser
 
 class AlpacaData():
     def __init__(self, keys_file_name):
@@ -47,9 +48,11 @@ class AlpacaData():
         complete = False
         page = None
 
-        # Progress bar
-        pbar = tqdm(total=100)
-        last_p_complete = 0
+        if logs:
+            # Progress bar
+            pbar = tqdm(total=100)
+            last_p_complete = 0
+        
         while not complete:
             # Structure the payload
             payload = {
@@ -77,10 +80,12 @@ class AlpacaData():
             a_df = pd.DataFrame(data=a_df, columns=columns)
             # Because bars are minutely, the last time will be in a minute format and will not have microseconds.
             try:
-                if datatype == 'bars':
-                    last_trade_time = dt.datetime.strptime(a_df['time'].iloc[-1], "%Y-%m-%dT%H:%M:%SZ")
-                else:
-                    last_trade_time = dt.datetime.strptime(a_df['time'].iloc[-1], "%Y-%m-%dT%H:%M:%S.%fZ")
+                # if datatype == 'bars':
+                #     last_trade_time = dt.datetime.strptime(a_df['time'].iloc[-1], "%Y-%m-%dT%H:%M:%SZ")
+                # else:
+                #     last_trade_time = dt.datetime.strptime(a_df['time'].iloc[-1], "%Y-%m-%dT%H:%M:%S.%fZ")
+                str_time = a_df['time'].iloc[-1]
+                last_trade_time = parser.parse(str_time)
             except:
                 print("Unable to get last_trade_time")
                 last_trade_time = False
@@ -100,7 +105,9 @@ class AlpacaData():
         true_df.index = pd.to_datetime(true_df["time"])
         true_df.drop("time", inplace=True, axis=1)
 
-        pbar.close()
+        if logs:
+            pbar.close()
+        
         return true_df
 
     # These three are pretty self explanitory
