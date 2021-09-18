@@ -26,7 +26,9 @@ class AlpacaTrader():
             }
     
     def get_current_price(self, symbol):
-        return requests.get(self.endpoint+"/v2/stocks/{symbol}/snapshot".format(symbol=symbol), headers=self.headers)
+        url = "https://data.alpaca.markets/v2/stocks/{symbol}/snapshot".format(symbol=symbol)
+        print(url)
+        return requests.get(url, headers=self.headers)
     
     def get_account(self):
         return requests.get(self.endpoint+"/v2/account", headers=self.headers)
@@ -81,6 +83,8 @@ class AlpacaTrader():
                     responses.append(self.place_market_order(key, abs(share_qty), "sell", verbose=verbose))
             else:
                 symbol_amount = total_value*dersired_holdings[key]
+                share_price = float(self.get_current_price(key).json()["latestQuote"]["ap"])
+                share_qty = round(symbol_amount/share_price)
                 if symbol_amount > 0:
                     responses.append(self.place_market_order(key, share_qty, "buy", verbose=verbose))
                 elif symbol_amount < 0:
