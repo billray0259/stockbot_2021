@@ -1,0 +1,15 @@
+README.md
+pyproject.toml
+setup.cfg
+src/lib/__init__.py
+src/lib/activations.py
+src/lib/alpaca_historical.py
+src/lib/alpaca_paper.py
+src/lib/losses.py
+src/lib/price_history.py
+src/lib/stock_dataset.py
+src/lib/util.py
+src/stockbot_2021.egg-info/PKG-INFO
+src/stockbot_2021.egg-info/SOURCES.txt
+src/stockbot_2021.egg-info/dependency_links.txt
+src/stockbot_2021.egg-info/top_level.txt
