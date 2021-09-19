@@ -77,3 +77,13 @@ Run notebooks in `src.nb.train/`
     * `test_<file_name>.py`
         * Tests functionality of `<file_name>`
 
+
+# Python Package
+## Updaing package
+* Make modifications to code
+* Modify the version number in `setup.cfg`
+* Run `python3 -m build`
+
+## Installing package
+* Run `pip3 install .` from the `stockbot_2021` directory
+* For Bill's conda environment the command is `/Users/bill/miniforge3/envs/tf_arm/bin/pip3 install .`

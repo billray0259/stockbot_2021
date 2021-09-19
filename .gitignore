@@ -5,3 +5,6 @@ data/
 *.pytest_cache/
 env/
 .ipynb_checkpoints/
+
+src/stockbot_2021.egg-info/
+dist/
