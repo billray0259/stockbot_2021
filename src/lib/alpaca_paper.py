@@ -1,10 +1,12 @@
 import json
+from os import stat
 # from os import P_OVERLAY
 import pytz
 import datetime as dt
 import requests
 from requests.api import head
 from requests.models import Response
+from src.lib.alpaca_exceptions import *
 
 est = pytz.timezone('US/Eastern')
 
@@ -27,35 +29,50 @@ class AlpacaTrader():
     
     def get_current_price(self, symbol):
         url = "https://data.alpaca.markets/v2/stocks/{symbol}/snapshot".format(symbol=symbol)
-        print(url)
-        return requests.get(url, headers=self.headers)
+        response = requests.get(url, headers=self.headers)
+        if response.status_code != 200:
+            handle_errors(response)
+        return response
     
     def get_account(self):
-        return requests.get(self.endpoint+"/v2/account", headers=self.headers)
+        response = requests.get(self.endpoint+"/v2/account", headers=self.headers)
+        if response.status_code != 200:
+            handle_errors(response)
+        return response
 
     def get_positions(self):
-        return requests.get(self.endpoint+"/v2/positions", headers=self.headers)
+        response = requests.get(self.endpoint+"/v2/positions", headers=self.headers)
+        if response.status_code != 200:
+            handle_errors(response)
+        return response
 
-    def get_holdings(self, raw=False, total_value=False):
-        cash_amount = float(self.get_account().json()['cash'])
-        total_value = cash_amount
-        positions = self.get_positions().json()
+    def get_cash_amount(self):
+        account = self.get_account()
+        if account.status_code != 200:
+            handle_errors(account)
+        return float(account.json()['cash'])
+
+    def calculate_raw_holdings(positions, total_value, cash_amount):
         holdings = {}
         for position in positions:
             market_value = float(position["market_value"])
             total_value += market_value
             holdings[position["symbol"]] = market_value
         holdings["cash"] = cash_amount
+        return holdings
+
+    def get_holdings(self, raw=False, total_value=False):
+        cash_amount = self.get_cash_amount()
+        total_value = cash_amount
+        positions = self.get_positions().json()
+        holdings = self.calculate_raw_holdings(positions, total_value, cash_amount)
         if not raw:
             for key in holdings.keys():
                 holdings[key] = holdings[key]/total_value
             holdings["cash"] = cash_amount/total_value
         return holdings, total_value
 
-    def update_holdings(self, dersired_holdings, cancel_orders=True, verbose=False):
-        current_holdings_raw, total_value = self.get_holdings(raw=True, total_value=True)
-        responses = []
-        orders = self.get_orders().json()
+    def parse_orders(self, orders):
         orders_dict = {}
         for order in orders:
             symbol = order["symbol"]
@@ -63,7 +80,10 @@ class AlpacaTrader():
                 orders_dict[symbol].append(order)
             else:
                 orders_dict[symbol] = [order]
-        for key in dersired_holdings.keys():
+    
+    def update_current_holdings(self, current_holdings_raw, desired_holdings, orders_dict, cancel_orders):
+        responses = []
+        for key in desired_holdings.keys():
             if key in orders_dict:
                 if cancel_orders:
                     for order in orders_dict[key]:
@@ -73,23 +93,49 @@ class AlpacaTrader():
                         current_holdings_raw[key] = float(order["notional"])
                     elif order["qty"] is not None:
                         current_holdings_raw[key] = float(self.get_current_price(key).json()["latestQuote"]["ap"]) * float(order["qty"])
-            if key in current_holdings_raw:
-                symbol_amount = (total_value*dersired_holdings[key]) - current_holdings_raw[key]
-                share_price = float(self.get_current_price(key).json()["latestQuote"]["ap"])
-                share_qty = round(symbol_amount/share_price)
-                if symbol_amount > 0:
-                    responses.append(self.place_market_order(key, share_qty, "buy", verbose=verbose))
-                elif symbol_amount < 0:
-                    responses.append(self.place_market_order(key, abs(share_qty), "sell", verbose=verbose))
-            else:
-                symbol_amount = total_value*dersired_holdings[key]
-                share_price = float(self.get_current_price(key).json()["latestQuote"]["ap"])
-                share_qty = round(symbol_amount/share_price)
-                if symbol_amount > 0:
-                    responses.append(self.place_market_order(key, share_qty, "buy", verbose=verbose))
-                elif symbol_amount < 0:
-                    responses.append(self.place_market_order(key, abs(share_qty), "sell", verbose=verbose))
+
+    def handle_order(self, symbol_amount, symbol, responses, verbose):
+        share_price = float(self.get_current_price(symbol).json()["latestQuote"]["ap"])
+        share_qty = round(symbol_amount/share_price)
+        if symbol_amount > 0:
+            responses.append(self.place_market_order(symbol, share_qty, "buy", verbose=verbose))
+        elif symbol_amount < 0:
+            responses.append(self.place_market_order(symbol, abs(share_qty), "sell", verbose=verbose))
+
+
+    def parse_key(self, key, current_holdings_raw, total_value, desired_value, responses, verbose):
+        if key in current_holdings_raw:
+            symbol_amount = (total_value*desired_value) - current_holdings_raw[key]
+            responses = self.handle_order(symbol_amount, key, responses, verbose)
+        else:
+            symbol_amount = total_value*desired_value
+            responses = self.handle_order(symbol_amount, key, responses, verbose)
         return responses
+
+    def update_holdings(self, desired_holdings, cancel_orders=True, verbose=False):
+        current_holdings_raw, total_value = self.get_holdings(raw=True, total_value=True)
+        orders = self.get_orders().json()
+        orders_dict = self.parse_orders(orders)
+        responses, current_holdings_raw = self.update_current_holdings(current_holdings_raw, desired_holdings, orders_dict, cancel_orders)
+        for key in desired_holdings.keys():
+            responses = self.parse_key(key, current_holdings_raw, total_value, desired_holdings[key], responses, verbose)
+        return responses
+
+    def get_oustanding_orders(self, days_look_back=365):
+        orders = self.get_orders(status="open", after=dt.datetime.now().astimezone(tz=pytz.timezone("UTC"))-dt.timedelta(days=days_look_back)).json()
+        return orders
+
+    def get_closed_orders(self, days_look_back=365):
+        orders = self.get_orders(status="closed", after=dt.datetime.now().astimezone(tz=pytz.timezone("UTC"))-dt.timedelta(days=days_look_back)).json()
+        return orders
+
+    def get_loggable_orders(self, logged_ids):
+        loggable_orders = []
+        orders = self.get_closed_orders()
+        for order in orders:
+            if order["order_id"] not in logged_ids:
+                loggable_orders.append(order)
+        return loggable_orders
 
     def place_dollar_order(self, symbol, amount, side, verbose=False):
         if verbose:
@@ -104,21 +150,24 @@ class AlpacaTrader():
         return requests.post(self.endpoint+"/v2/orders", headers=self.headers, json=payload)
 
     def get_orders(self, status="all", symbols=None, limit=100, after=None, until=None, direction="desc", nested=True):
-        # if after is None:
-        #     after = dt.datetime.now(tzinfo=est)-dt.timedelta(years=1)
-        # if until is None:
-        #     until = dt.datetime.now(tzinfo=est)
+        if after is None:
+            after = dt.datetime.now().astimezone(tz=pytz.timezone("UTC"))-dt.timedelta(days=365)
+        if until is None:
+            until = dt.datetime.now().astimezone(tz=pytz.timezone("UTC"))
         payload = {
             "status": status,
             "limit": limit,
-            # "after": after.replace(tzinfo=pytz.UTC).isoformat(),
-            # "until": until.replace(tzinfo=pytz.UTC).isoformat(),
+            "after": after.replace(tzinfo=pytz.UTC).isoformat(),
+            "until": until.replace(tzinfo=pytz.UTC).isoformat(),
             "direction": direction,
             "nested": nested,
         }
         if symbols is not None:
             payload["symbols"] = symbols
-        return requests.get(self.endpoint+"/v2/orders", headers=self.headers, json=payload)
+        response = requests.get(self.endpoint+"/v2/orders", headers=self.headers, json=payload)
+        if response.status_code != 200:
+            handle_errors(response)
+        return response
 
     def place_market_order(self, symbol, quantity, side, time_in_force="day", verbose=False):
         if verbose:
