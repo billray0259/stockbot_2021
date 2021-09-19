@@ -1,0 +1,1 @@
+{"name": "1_lstm_ptrade", "symbols": ["SPY", "SPXS"], "n_time_steps": 64, "batch_size": 256, "epochs": 5, "learning_rate": 0.0003, "target_column": "oc_ret"}

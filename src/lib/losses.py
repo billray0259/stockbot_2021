@@ -18,7 +18,7 @@ def single_negative_sharpe_ratio_loss(y_true, y_pred):
     rets = y_pred * y_true
     rets_std = K.std(rets)
     benchmark = K.mean(y_true)
-    return (benchmark - rets) / rets_std
+    return (benchmark - rets) / (rets_std + K.epsilon())
 
 
 def multi_negative_sharpe_ratio_loss(y_true, y_pred):
@@ -38,4 +38,4 @@ def multi_negative_sharpe_ratio_loss(y_true, y_pred):
     # benchmark = K.mean(buy_and_hold_rets)
     # print(benchmark)
     
-    return (benchmark - rets) / rets_std
+    return (benchmark - rets) / (rets_std + K.epsilon())

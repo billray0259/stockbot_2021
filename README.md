@@ -81,7 +81,7 @@ Run notebooks in `src.nb.train/`
 # Python Package
 
 ## Updating package
-* Change code in `lib`
+* Make whatever changes you want in the `lib` directory
 * Modify the version number in `setup.cfg`
 * Run `python3 -m build`
     * If `build` is not installed install it with `python3 -m pip install --upgrade build`
@@ -91,8 +91,16 @@ Run notebooks in `src.nb.train/`
 * For Bill's conda environment the command is `/Users/bill/miniforge3/envs/tf_arm/bin/pip3 install .`
 
 # Running Daemon Scripts
-* Everything that runs starts as a notebook
+* Write all daemon code as a jupyter notebook
 * Ensure the notebook works and no imported code needs to be changed to make the notebook work
-* Build/install the package
+* Update the package (see above)
+* Install the package (see above)
 * Convert the jupyter notebook to a script with `jupyter nbconvert --to script [YOUR_NOTEBOOK].ipynb`
-* Run the script in a new screen
+* Add the following code to the top of the generated script to fix the imports
+```python
+import sys
+import lib
+sys.modules["src.lib"] = lib
+```
+* Run the script in a separate screen
+* Detatch from the screen
