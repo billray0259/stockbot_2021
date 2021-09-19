@@ -32,6 +32,7 @@ class AlpacaData():
         # If we are logging, calculate the total seconds we have asked for
         if logs:
             total_seconds = (end-start).total_seconds()
+        
         # Format the url and dataframe columns based on datatype
         if datatype == 'bars':
             url = "https://data.alpaca.markets/v2/stocks/"+symbol+"/bars"
@@ -43,7 +44,8 @@ class AlpacaData():
             url = "https://data.alpaca.markets/v2/stocks/"+symbol+"/trades"
             columns = ["time",'exchange','price','size','conditions','trade_id','tape']
         else:
-            return "Invalid datatype, bars, quotes, trades"
+            raise ValueError("Invalid datatype, bars, quotes, trades")
+        
         true_df = pd.DataFrame(columns=columns)
         complete = False
         page = None
@@ -64,37 +66,44 @@ class AlpacaData():
             # If the page token is not none (alpaca had more data for us) set the page to the page token
             if page is not None:
                 payload['page_token'] = page
+            
             # If using bars we need to specify a timeframe, this can be changed
             if datatype == 'bars':
                 payload['timeframe'] = timeframe
+            
             # Send a data request
-            print(payload)
             response = requests.get(url, headers=self.headers, params=payload)
             if response.status_code != 200:
-                return "Failed to get data, status code %d, content, %s" % (response.status_code, response.content)
+                raise ValueError("Failed to get data, status code %d, content, %s" % (response.status_code, response.content))
+            
             a_data = response.json()
             a_df = []
+
+            # If there is no data in the requested time return empty dataframe
+            if datatype not in a_data or a_data[datatype] is None:
+                return true_df
+            
             # Get the page token and shove the data into a dataframe.
             page = a_data['next_page_token']
             for item in a_data[datatype]:
                 a_df.append(item.values())
             a_df = pd.DataFrame(data=a_df, columns=columns)
+            
             # Because bars are minutely, the last time will be in a minute format and will not have microseconds.
             try:
-                # if datatype == 'bars':
-                #     last_trade_time = dt.datetime.strptime(a_df['time'].iloc[-1], "%Y-%m-%dT%H:%M:%SZ")
-                # else:
-                #     last_trade_time = dt.datetime.strptime(a_df['time'].iloc[-1], "%Y-%m-%dT%H:%M:%S.%fZ")
                 str_time = a_df['time'].iloc[-1]
                 last_trade_time = parser.parse(str_time)
             except:
                 print("Unable to get last_trade_time")
                 last_trade_time = False
+            
             # Add this particular dataset to the larger datasert
             true_df = true_df.append(a_df, ignore_index=True)
+            
             # If the page is none (alpaca has no more data for us) we are done and can quit
             if page is None:
                 complete = True
+            
             # Handle logging of last trade and percentage completed.
             if logs and last_trade_time:
                 diff = total_seconds-(end-last_trade_time).total_seconds()
@@ -102,7 +111,7 @@ class AlpacaData():
                 pbar.update(p_complete - last_p_complete)
                 last_p_complete = p_complete
                 pbar.set_description(str(last_trade_time))
-                # print(last_trade_time, perc_completed)
+            
         true_df.index = pd.to_datetime(true_df["time"])
         true_df.drop("time", inplace=True, axis=1)
 

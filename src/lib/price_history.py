@@ -77,6 +77,8 @@ def transform_price_history(price_history, **kwargs):
 class PriceHistory:
 
     def __init__(self, data, symbol):
+        assert len(data) > 0, "Can not accept empty data"
+        
         self.data = data
         self.start_date = data.index[0]
         self.end_date = data.index[-1]

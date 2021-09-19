@@ -79,11 +79,20 @@ Run notebooks in `src.nb.train/`
 
 
 # Python Package
-## Updaing package
-* Make modifications to code
+
+## Updating package
+* Change code in `lib`
 * Modify the version number in `setup.cfg`
 * Run `python3 -m build`
+    * If `build` is not installed install it with `python3 -m pip install --upgrade build`
 
 ## Installing package
 * Run `pip3 install .` from the `stockbot_2021` directory
 * For Bill's conda environment the command is `/Users/bill/miniforge3/envs/tf_arm/bin/pip3 install .`
+
+# Running Daemon Scripts
+* Everything that runs starts as a notebook
+* Ensure the notebook works and no imported code needs to be changed to make the notebook work
+* Build/install the package
+* Convert the jupyter notebook to a script with `jupyter nbconvert --to script [YOUR_NOTEBOOK].ipynb`
+* Run the script in a new screen
