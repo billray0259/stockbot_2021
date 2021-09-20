@@ -217,7 +217,7 @@ class PriceHistory:
 
             elif indicator.startswith("ma_"):
                 length = int(indicator[len("ma_"):])
-                moving_average = self.data[main_column].rolling(window=length, min_periods=1).mean()
+                moving_average = self.data[main_column].rolling(window=length, min_periods=length).mean()
                 indicator_data[indicator] = moving_average/self.data[main_column] - 1
             
             elif indicator.startswith("pdiff_"):
