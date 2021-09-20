@@ -172,6 +172,11 @@ class AlpacaTrader():
     def place_market_order(self, symbol, quantity, side, time_in_force="day", verbose=False):
         if verbose:
             print(side, symbol, quantity)
+        if quantity == 0:
+            if verbose:
+                print("Warning: Attempting to trade 0 shares, canceling order")
+            return None
+        
         payload = {
             "symbol": symbol,
             "qty": str(quantity),

@@ -57,9 +57,10 @@ class AlpacaData():
         
         while not complete:
             # Structure the payload
+            est = pytz.timezone("US/Eastern")
             payload = {
-                "start": start.replace(tzinfo=pytz.UTC).isoformat(),
-                "end": end.replace(tzinfo=pytz.UTC).isoformat(),
+                "start": start.replace(tzinfo=est).isoformat(),
+                "end": end.replace(tzinfo=est).isoformat(),
                 "limit": 10000
             }
             

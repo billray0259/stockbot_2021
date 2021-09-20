@@ -8,3 +8,8 @@ env/
 
 src/stockbot_2021.egg-info/
 dist/
+
+results/*/Xs
+results/*/trade_log.txt
+
+*/.DS_Store

@@ -10,9 +10,7 @@ from src.lib.util import trim_nan_rows
 from sklearn.preprocessing import StandardScaler
 
 def read_stock_dataset(symbols, target_column, n_time_steps, transform=True, **kwargs):
-    data_dir = None
-    if "data_dir" in kwargs:
-        data_dir = kwargs["data_dir"]
+    data_dir = kwargs.pop("data_dir", None)
     
     price_histories = []
     for symbol in symbols:
@@ -82,15 +80,22 @@ class StockDataset:
         return PriceHistory(history_df, symbol)
     
 
-    def swap_data(self, new_X, new_y=None):
-        assert set(new_X.columns) == set(self.X.columns), "Can not change columns of StockDataset"
+    def swap_data(self, new_data):
+        
+
+        assert set(new_data.columns) == set(self.data.columns), "Can not change columns of StockDataset"
 
         copy = deepcopy(self)
-        copy.X = new_X
+        # copy.X = new_X
 
-        if new_y is not None:
-            assert set(new_y.columns) == set(self.y.columns), "Can not change columns of StockDataset"
-            copy.y = new_y
+        copy.data = new_data
+        copy.y = new_data[copy.target_columns][1:]
+        copy.X = new_data[:-1]
+        copy.y.index = copy.X.index
+
+        # if new_y is not None:
+        #     assert set(new_y.columns) == set(self.y.columns), "Can not change columns of StockDataset"
+        #     copy.y = new_y
         
         return copy
     
@@ -101,18 +106,22 @@ class StockDataset:
 
         assert end_train_time > self.X.index[0], "No training data. All data selected for validation and testing"
 
-        train_X = self.X[:end_train_time]
-        train_y = self.y[:end_train_time]
+        # train_X = self.X[:end_train_time]
+        # train_y = self.y[:end_train_time]
         
-        valid_X = self.X[end_train_time: end_valid_time]
-        valid_y = self.y[end_train_time: end_valid_time]
+        # valid_X = self.X[end_train_time: end_valid_time]
+        # valid_y = self.y[end_train_time: end_valid_time]
 
-        test_X = self.X[end_valid_time:]
-        test_y = self.y[end_valid_time:]
+        # test_X = self.X[end_valid_time:]
+        # test_y = self.y[end_valid_time:]
 
-        train = self.swap_data(train_X, train_y)
-        valid = self.swap_data(valid_X, valid_y)
-        test = self.swap_data(test_X, test_y)
+        train_data = self.data[:end_train_time]
+        valid_data = self.data[end_train_time: end_valid_time]
+        test_data = self.data[end_valid_time:]
+
+        train = self.swap_data(train_data)
+        valid = self.swap_data(valid_data)
+        test = self.swap_data(test_data)
 
         if scaled:
             scaler = train.fit_standard_scaler()
@@ -131,9 +140,9 @@ class StockDataset:
 
     
     def apply_standard_scaler(self, scaler):
-        X = scaler.transform(self.X)
-        new_X = pd.DataFrame(X, self.X.index, self.X.columns)
-        return self.swap_data(new_X)
+        data = scaler.transform(self.data)
+        new_data = pd.DataFrame(data, self.data.index, self.data.columns)
+        return self.swap_data(new_data)
 
 
     def get_batchable_index(self, trade_market_open=True):
