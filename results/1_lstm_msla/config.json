@@ -1,1 +1,1 @@
-{"name": "1_lstm_msla", "symbols": ["SPY", "SPXS"], "n_time_steps": 64, "batch_size": 256, "epochs": 5, "learning_rate": 0.0003, "target_column": "oc_ret"}
+{"name": "1_lstm_msla", "symbols": ["SPY", "SPXS", "NVDA", "AMD", "TSLA", "SPXL"], "n_time_steps": 64, "batch_size": 256, "epochs": 5, "learning_rate": 0.0003, "target_column": "oc_ret"}

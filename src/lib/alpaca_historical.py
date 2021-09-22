@@ -1,5 +1,6 @@
+import os
 import requests
-import datetime as dt
+from datetime import timezone, datetime
 import pytz
 import json
 import pandas as pd
@@ -7,7 +8,10 @@ import pytz
 from tqdm import tqdm
 from dateutil import parser
 
+from src.lib.price_history import read_price_history
+
 class AlpacaData():
+
     def __init__(self, keys_file_name):
         with open(keys_file_name, "r") as keys_file:
             keys = json.load(keys_file)
@@ -57,10 +61,10 @@ class AlpacaData():
         
         while not complete:
             # Structure the payload
-            est = pytz.timezone("US/Eastern")
+            # est = pytz.timezone("US/Eastern")
             payload = {
-                "start": start.replace(tzinfo=est).isoformat(),
-                "end": end.replace(tzinfo=est).isoformat(),
+                "start": start.replace(tzinfo=timezone.utc).isoformat(),
+                "end": end.replace(tzinfo=timezone.utc).isoformat(),
                 "limit": 10000
             }
             
@@ -73,11 +77,16 @@ class AlpacaData():
                 payload['timeframe'] = timeframe
             
             # Send a data request
+            
+            # print(url)
+            # print(self.headers)
+            # print(payload)
             response = requests.get(url, headers=self.headers, params=payload)
             if response.status_code != 200:
                 raise ValueError("Failed to get data, status code %d, content, %s" % (response.status_code, response.content))
             
             a_data = response.json()
+            # print(a_data)
             a_df = []
 
             # If there is no data in the requested time return empty dataframe
@@ -120,6 +129,15 @@ class AlpacaData():
             pbar.close()
         
         return true_df
+    
+    def update_saved_data(self, symbol, log=True, timeframe="1Min", data_dir=None, path=None):
+        data_path = path or os.path.join(data_dir or "data/", symbol, f"{symbol}_1Min.csv")
+        df = pd.read_csv(data_path, index_col="time")
+        df.index = pd.to_datetime(df.index)
+        last_date = df.index[-1]
+        new_data = self.get_bars(symbol, last_date, datetime.now(timezone.utc), log=log, timeframe=timeframe)
+        df = df.append(new_data.iloc[1:])
+        df.to_csv(data_path)
 
     # These three are pretty self explanitory
     def get_bars(self, symbol, start, end, log=True, timeframe="1Min"):

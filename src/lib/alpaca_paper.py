@@ -52,7 +52,7 @@ class AlpacaTrader():
             handle_errors(account)
         return float(account.json()['cash'])
 
-    def calculate_raw_holdings(positions, total_value, cash_amount):
+    def calculate_raw_holdings(self, positions, total_value, cash_amount):
         holdings = {}
         for position in positions:
             market_value = float(position["market_value"])
@@ -80,6 +80,7 @@ class AlpacaTrader():
                 orders_dict[symbol].append(order)
             else:
                 orders_dict[symbol] = [order]
+        return orders_dict
     
     def update_current_holdings(self, current_holdings_raw, desired_holdings, orders_dict, cancel_orders):
         responses = []
@@ -93,6 +94,7 @@ class AlpacaTrader():
                         current_holdings_raw[key] = float(order["notional"])
                     elif order["qty"] is not None:
                         current_holdings_raw[key] = float(self.get_current_price(key).json()["latestQuote"]["ap"]) * float(order["qty"])
+        return responses, current_holdings_raw
 
     def handle_order(self, symbol_amount, symbol, responses, verbose):
         share_price = float(self.get_current_price(symbol).json()["latestQuote"]["ap"])
@@ -101,6 +103,7 @@ class AlpacaTrader():
             responses.append(self.place_market_order(symbol, share_qty, "buy", verbose=verbose))
         elif symbol_amount < 0:
             responses.append(self.place_market_order(symbol, abs(share_qty), "sell", verbose=verbose))
+        return responses
 
 
     def parse_key(self, key, current_holdings_raw, total_value, desired_value, responses, verbose):
@@ -112,14 +115,62 @@ class AlpacaTrader():
             responses = self.handle_order(symbol_amount, key, responses, verbose)
         return responses
 
-    def update_holdings(self, desired_holdings, cancel_orders=True, verbose=False):
-        current_holdings_raw, total_value = self.get_holdings(raw=True, total_value=True)
-        orders = self.get_orders().json()
-        orders_dict = self.parse_orders(orders)
-        responses, current_holdings_raw = self.update_current_holdings(current_holdings_raw, desired_holdings, orders_dict, cancel_orders)
-        for key in desired_holdings.keys():
-            responses = self.parse_key(key, current_holdings_raw, total_value, desired_holdings[key], responses, verbose)
-        return responses
+    # def update_holdings(self, desired_holdings, cancel_orders=True, verbose=False):
+    #     current_holdings_raw, total_value = self.get_holdings(raw=True, total_value=True)
+    #     orders = self.get_orders().json()
+    #     orders_dict = self.parse_orders(orders)
+    #     responses, current_holdings_raw = self.update_current_holdings(current_holdings_raw, desired_holdings, orders_dict, cancel_orders)
+    #     for key in desired_holdings.keys():
+    #         responses = self.parse_key(key, current_holdings_raw, total_value, desired_holdings[key], responses, verbose)
+    #     return responses
+
+    def update_holdings(self, desired_holdings, verbose=False):
+        # Get the total account equity
+        equity = float(self.get_account().json()["equity"])
+        
+        # Get current account positions
+        positions = self.get_positions().json()
+
+        # Find the price of every relevant symbol
+        prices = {}
+        # All symbols currently being held
+        for position in positions:
+            prices[position["symbol"]] = float(position["current_price"])
+
+        # All desired symbols excluding already held symbols
+        for symbol in desired_holdings:
+            if symbol not in prices:
+                prices[symbol] = float(self.get_current_price(symbol).json()["latestTrade"]["p"])
+        
+        # Find the current holdings as a percentage of account equity
+        current_holdings = {}
+        for position in positions:
+            symbol = position["symbol"]
+            dollar_amount = float(position["qty"]) * prices[symbol]
+            current_holdings[symbol] = dollar_amount / equity
+        
+        # Determine how much current_holdings needs to change to match desired holdings
+        delta_holdings = {}
+
+        for symbol in prices:
+            if symbol in current_holdings and symbol in desired_holdings:
+                delta_holdings[symbol] = desired_holdings[symbol] - current_holdings[symbol]
+
+            elif symbol in desired_holdings:
+                delta_holdings[symbol] = desired_holdings[symbol]
+
+            elif symbol in current_holdings:
+                delta_holdings[symbol] = -current_holdings[symbol]
+
+        # Convert the percentages of total account equity to shares and place trades
+        for symbol, p_equity in delta_holdings.items():
+            price = prices[symbol]
+            n_shares = int(p_equity * equity / price)
+
+            if n_shares < 0:
+                self.place_market_order(symbol, -n_shares, "sell", verbose=verbose)
+            elif n_shares > 0:
+                self.place_market_order(symbol, n_shares, "buy", verbose=verbose)
 
     def get_oustanding_orders(self, days_look_back=365):
         orders = self.get_orders(status="open", after=dt.datetime.now().astimezone(tz=pytz.timezone("UTC"))-dt.timedelta(days=days_look_back)).json()
@@ -184,7 +235,9 @@ class AlpacaTrader():
             "type": "market",
             "time_in_force": time_in_force
         }
-        return requests.post(self.endpoint+"/v2/orders", headers=self.headers, json=payload)
+        response = requests.post(self.endpoint+"/v2/orders", headers=self.headers, json=payload)
+        if response.status_code != 200:
+            print("Order failed", response.status_code, f"\"{response.text}\"")
 
     def place_limit_order(self, symbol, quantity, side, limit_price, time_in_force="day"):
         payload = {

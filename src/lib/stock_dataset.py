@@ -3,6 +3,8 @@ import numpy as np
 from collections import OrderedDict
 from copy import deepcopy
 
+from tensorflow.python.keras.backend import concatenate
+
 from src.lib.price_history import read_price_history, transform_price_history, PriceHistory
 from src.lib.util import trim_nan_rows
 
@@ -22,41 +24,44 @@ def read_stock_dataset(symbols, target_column, n_time_steps, transform=True, **k
     return StockDataset(price_histories, target_column, n_time_steps)
 
 
+def join_price_histories(price_histories, target_column):
+    column_records = OrderedDict()
+    target_columns = []
+
+    history_datas = []
+    for history in price_histories:
+        symbol = history.symbol
+        original_columns = history.data.columns
+        assert target_column in original_columns, f"History for {symbol} does not contain target column: {target_column}"
+
+        add_symbol = lambda col: f"{symbol}_{col}"
+        new_columns = [add_symbol(col) for col in original_columns]
+        target_columns.append(add_symbol(target_column))
+
+        history.data.columns = new_columns
+        column_records[symbol] = {
+            "original": original_columns,
+            "new": new_columns
+        }
+
+        history_datas.append(history.data)
+    
+    concatenated = pd.concat(history_datas, axis=1)
+    return concatenated, column_records, target_columns
+
 class StockDataset:
 
     def __init__(self, price_histories, target_column, n_time_steps):
-        self.column_records = OrderedDict()
         self.target_columns = []
         self.n_time_steps = n_time_steps
 
-        history_datas = []
-        for history in price_histories:
-            symbol = history.symbol
-            original_columns = history.data.columns
-            assert target_column in original_columns, f"History for {symbol} does not contain target column: {target_column}"
+        concatenated, self.column_records, self.target_columns = join_price_histories(price_histories, target_column)
 
-            add_symbol = lambda col: f"{symbol}_{col}"
-            new_columns = [add_symbol(col) for col in original_columns]
-            self.target_columns.append(add_symbol(target_column))
-
-            history.data.columns = new_columns
-            self.column_records[symbol] = {
-                "original": original_columns,
-                "new": new_columns
-            }
-
-            history_datas.append(history.data)
-        
-        concatenated = pd.concat(history_datas, axis=1)
-        self.data = trim_nan_rows(concatenated)
-        self.y = self.data[self.target_columns][1:]
-        self.X = self.data[:-1]
+        data = trim_nan_rows(concatenated)
+        self.y = data[self.target_columns][1:]
+        self.X = data[:-1]
         self.y.index = self.X.index
-    
-    
-    def prediction_X(self, n_time_steps):
-        return self.data[-n_time_steps:].to_numpy()[np.newaxis, :, :]
-
+        
 
     def __deepcopy__(self, memo):
         # https://stackoverflow.com/questions/1500718/how-to-override-the-copy-deepcopy-operations-for-a-python-object
@@ -80,24 +85,26 @@ class StockDataset:
         return PriceHistory(history_df, symbol)
     
 
-    def swap_data(self, new_data):
-        
-
-        assert set(new_data.columns) == set(self.data.columns), "Can not change columns of StockDataset"
-
+    def swap_data(self, new_X, new_y=None):
+        assert set(new_X.columns) == set(self.X.columns), "Can not change columns of StockDataset"
         copy = deepcopy(self)
-        # copy.X = new_X
-
-        copy.data = new_data
-        copy.y = new_data[copy.target_columns][1:]
-        copy.X = new_data[:-1]
-        copy.y.index = copy.X.index
-
-        # if new_y is not None:
-        #     assert set(new_y.columns) == set(self.y.columns), "Can not change columns of StockDataset"
-        #     copy.y = new_y
+        copy.X = new_X
+        if new_y is not None:
+            assert set(new_y.columns) == set(self.y.columns), "Can not change columns of StockDataset"
+            copy.y = new_y
         
         return copy
+    
+
+    # def swap_data(self, new_X, new_y=None):
+    #     assert set(new_X.columns) == set(self.X.columns), "Can not change columns of StockDataset"
+
+    #     copy = deepcopy(self)
+    #     copy.X = new_X
+
+    #     if new_y is not None:
+    #         assert set(new_y.columns) == set(self.y.columns), "Can not change columns of StockDataset"
+    #         copy.y = new_y
     
 
     def train_valid_test_split(self, valid_time, test_time, scaled):
@@ -106,22 +113,18 @@ class StockDataset:
 
         assert end_train_time > self.X.index[0], "No training data. All data selected for validation and testing"
 
-        # train_X = self.X[:end_train_time]
-        # train_y = self.y[:end_train_time]
+        train_X = self.X[:end_train_time]
+        train_y = self.y[:end_train_time]
         
-        # valid_X = self.X[end_train_time: end_valid_time]
-        # valid_y = self.y[end_train_time: end_valid_time]
+        valid_X = self.X[end_train_time: end_valid_time]
+        valid_y = self.y[end_train_time: end_valid_time]
 
-        # test_X = self.X[end_valid_time:]
-        # test_y = self.y[end_valid_time:]
+        test_X = self.X[end_valid_time:]
+        test_y = self.y[end_valid_time:]
 
-        train_data = self.data[:end_train_time]
-        valid_data = self.data[end_train_time: end_valid_time]
-        test_data = self.data[end_valid_time:]
-
-        train = self.swap_data(train_data)
-        valid = self.swap_data(valid_data)
-        test = self.swap_data(test_data)
+        train = self.swap_data(train_X, train_y)
+        valid = self.swap_data(valid_X, valid_y)
+        test = self.swap_data(test_X, test_y)
 
         if scaled:
             scaler = train.fit_standard_scaler()
@@ -140,9 +143,9 @@ class StockDataset:
 
     
     def apply_standard_scaler(self, scaler):
-        data = scaler.transform(self.data)
-        new_data = pd.DataFrame(data, self.data.index, self.data.columns)
-        return self.swap_data(new_data)
+        X = scaler.transform(self.X)
+        new_X = pd.DataFrame(X, self.X.index, self.X.columns)
+        return self.swap_data(new_X)
 
 
     def get_batchable_index(self, trade_market_open=True):
