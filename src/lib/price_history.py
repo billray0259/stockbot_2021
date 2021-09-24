@@ -186,7 +186,7 @@ class PriceHistory:
 
         for indicator in indicators:
             if indicator == "oc_ret":
-                indicator_data[indicator] = self.data["close"]/self.data["open"] - 1
+                indicator_data[indicator] = (self.data["close"]-0.005)/self.data["open"] - 1
 
             elif indicator == "rsi":
                 indicator_data[indicator] = ta.rsi(self.data[main_column])
