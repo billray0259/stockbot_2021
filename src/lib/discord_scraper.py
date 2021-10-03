@@ -21,22 +21,17 @@ CREDS = BOT_TOKEN
 UTOPIA = 679921845671035034
 
 parent_dir = os.getcwd()
-print(parent_dir)
 if not os.path.isdir("data/DISCORD"):
     os.mkdir("data/DISCORD")
+
+
 @client.event
 async def on_ready():
-    print("Maintenance Bot is Ready")
-
-@client.command()
-async def scrape(ctx):
+    print("Bot is Ready, Scraping discord")
     server_name = "UTOPIA"
     utopia = client.get_guild(UTOPIA)
     channels = utopia.channels
-    #channel = channels[0]
-    
     for channel in channels:
-        #print(channel, channel.category, type(channel))
         if type(channel) == discord.channel.TextChannel:
             try:
                 messages = await channel.history(limit=LIMIT, oldest_first=OLDEST_FIRST).flatten()
@@ -56,5 +51,6 @@ async def scrape(ctx):
                 channel_df.to_csv("data/DISCORD/"+server_name+"/"+channel.name+".csv")
             except:
                 print("Failed on", channel.name)
+    client.close()
 
 client.run(CREDS)
