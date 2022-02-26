@@ -1,0 +1,1 @@
+mongodb://acer_server:27017/stockbot_2021?retryWrites=true&w=majority

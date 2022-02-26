@@ -1,3 +1,14 @@
+alpaca_config.json
+
 data/
 *__pycache__/
 *.pytest_cache/
+env/
+.ipynb_checkpoints/
+
+src/stockbot_2021.egg-info/
+dist/
+
+results/*/Xs
+
+.DS_Store

@@ -8,7 +8,7 @@ def negative_profit_loss(y_true, y_pred):
         y_pred (float): Positioning where -1 represents 100% short, and 1 represents 100% long
 
     Returns:
-        float: Negative profit from 
+        float: Negative profit from holdings descroibed by y_pred 
     """
 
     return -y_pred * y_true
@@ -17,8 +17,10 @@ def negative_profit_loss(y_true, y_pred):
 def single_negative_sharpe_ratio_loss(y_true, y_pred):
     rets = y_pred * y_true
     rets_std = K.std(rets)
+    # benchmark = K.maximum(K.mean(y_true), 9.66e-7)
+    # benchmark = 1e-5
     benchmark = K.mean(y_true)
-    return (benchmark - rets) / rets_std
+    return (benchmark - rets) / (rets_std + K.epsilon())
 
 
 def multi_negative_sharpe_ratio_loss(y_true, y_pred):
@@ -34,7 +36,9 @@ def multi_negative_sharpe_ratio_loss(y_true, y_pred):
     rets = K.sum(y_pred * y_true, axis=-1) # Shape (batch_size,)
     rets_std = K.std(rets)
 
-    buy_and_hold_rets = K.sum(y_true, axis=-1)
+    buy_and_hold_rets = K.mean(y_true)
     benchmark = K.mean(buy_and_hold_rets)
+    # benchmark = K.maximum(K.mean(buy_and_hold_rets), 1e-6)
+    # print(benchmark)
     
-    return (benchmark - rets) / rets_std
+    return (benchmark - rets) / (rets_std + K.epsilon())

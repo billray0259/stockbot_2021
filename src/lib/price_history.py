@@ -1,3 +1,4 @@
+from datetime import timedelta
 import os
 
 import pandas as pd
@@ -54,6 +55,7 @@ def transform_price_history(price_history, **kwargs):
     calendar = "NYSE"
     indicators = None
     main_column = "close"
+    freq = timedelta(minutes=1)
 
     if kwargs is not None:
         if "calendar" in kwargs:
@@ -65,8 +67,13 @@ def transform_price_history(price_history, **kwargs):
         if "main_column" in kwargs:
             main_column = kwargs["main_column"]
 
+        if "freq" in kwargs:
+            freq = kwargs["freq"]
+
+            price_history = price_history.resample(freq)
+
     return price_history \
-        .isolate_market_hours(calendar=calendar) \
+        .isolate_market_hours(freq, calendar=calendar) \
         .fill_nan_candles() \
         .add_ta_indicators(indicators=indicators, main_column=main_column) \
         .drop_non_scalable() \
@@ -77,8 +84,42 @@ def transform_price_history(price_history, **kwargs):
 class PriceHistory:
 
     def __init__(self, data, symbol):
+        assert len(data) > 0, "Can not accept empty data"
+        
         self.data = data
+        self.start_date = data.index[0]
+        self.end_date = data.index[-1]
         self.symbol = symbol
+    
+    def resample(self, freq):
+        """ Resamples candlestick data to `freq`
+
+        Args:
+            freq ([type]): [description]
+
+        Returns:
+            [type]: [description]
+        """
+        data = self.data
+        resampled = data.resample(freq) 
+
+        new_data = resampled.apply({
+            "open": "first",
+            "high": "max",
+            "low": "min",
+            "close": "last",
+            "volume": "sum",
+            "trades": "sum",
+        })
+
+        weighted_price = data["vwap"] * data["volume"]
+
+        weighted_sum_price = weighted_price.resample(freq).sum()
+
+
+        new_data["vwap"] = weighted_sum_price / new_data["volume"]
+
+        return PriceHistory(new_data, self.symbol)
     
 
     def trim_nan_rows(self):
@@ -94,7 +135,7 @@ class PriceHistory:
         return PriceHistory(data, self.symbol)
 
 
-    def isolate_market_hours(self, calendar="NYSE"):
+    def isolate_market_hours(self, freq, calendar="NYSE"):
         """ Reindexes the data with every on-hour (weekdays 9:30 am EST - 4:00 pm EST] minutely time in the data range.
         * Does not include minutes for holidays or weekends.
         * Does not pad the data by inserting times before or after the first or last time in the original data.
@@ -112,9 +153,16 @@ class PriceHistory:
         nyse = mcal.get_calendar(calendar)
 
         schedule = nyse.schedule(start_date=start_date, end_date=end_date)
-        date_range = mcal.date_range(schedule, frequency="1T")
-        market_hours = self.data.reindex(date_range)
+        date_range = mcal.date_range(schedule, frequency=freq)
+        market_hours = self.data.reindex(date_range)[self.start_date: self.end_date]
         return PriceHistory(market_hours, self.symbol).trim_nan_rows()
+    
+    
+    # def resample(self, rule):
+    #     # [open, high, low, close, volume, vwap]
+    #     new_data = pd.DataFrame({
+    #         "open": self.data["open"].resample(rule)
+    #     }, index=None)
     
     
     def fill_nan_candles(self):
@@ -213,7 +261,8 @@ class PriceHistory:
 
             elif indicator.startswith("ma_"):
                 length = int(indicator[len("ma_"):])
-                moving_average = self.data[main_column].rolling(window=length, min_periods=1).mean()
+                # moving_average = self.data[main_column].rolling(window=length, min_periods=length).mean()
+                moving_average = ta.sma(self.data[main_column], length)
                 indicator_data[indicator] = moving_average/self.data[main_column] - 1
             
             elif indicator.startswith("pdiff_"):
