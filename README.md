@@ -1,3 +1,17 @@
+# Project Overview
+
+This project applies machine learning, in the form of recurrent and convolutional neural networks, to intra-day candlestick stock market data to generate a profitable trading strategy. 
+
+We introduced the negative softmax activation function that enabled our strategy to enter long and short positions simultaneously across multiple symbols while limiting total exposure to a pre-defined amount. We also introduced the negative Sharpe ratio loss, which we used to train our models to maximize the Sharpe ratio of their trading directly.
+
+We found that models that used these innovations had higher returns and significantly lower variance in their returns than a binary classifier trained to predict positive or negative movement in stock price with a cross-entropy loss.
+
+While the trading strategy learned by our models was highly effective when backtested on data previously unseen to the model when paper trading, the model underperformed the backtest results. The model was trained on candlestick data and did not have access to the bid and the ask when placing trades and had learned to exploit tiny price movements, and such exploitations were not profitable when trading with a non-zero spread. 
+
+Perhaps this approach could yield returns over typical market benchmarks with more advanced data sources.
+
+
+
 # Usage Guide
 
 ## Downloading Data
