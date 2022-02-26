@@ -55,10 +55,6 @@ Run notebooks in `src.nb.train/`
                     * Negative Softmax output: [-0.2, 0.3, -0.1, 0.4]
                     * Portfolio size: $100k
                     * Actions: Short $20k of FB, long $30k of AAPL, short $10k of NTFLX, long $40k of GOOG.
-    * `alpaca_historical.py`
-        * `TODO` Charlie document
-    * `alpaca_paper.py`
-        * `TODO` Charlie document
     * `losses.py`
         * Custom loss functions
             * Negative Profit Loss
