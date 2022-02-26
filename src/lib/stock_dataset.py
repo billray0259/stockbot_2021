@@ -209,6 +209,29 @@ class StockDataset:
         
         return X_batch, y_batch
 
+    # y: (batch_size, n_trades, n_symbols, 2)
+    # X: (batch_size, n_time_steps + n_trades - 1, n_features)
+    # def get_batch(self, batch_size, n_trades, int_index, shuffle=True, replace=True):
+    #     n_features = len(self.X.columns)
+    #     n_symbols = len(self.y.columns)
+    #     adj_n_time_steps = self.n_time_steps + n_trades - 1
+    #     X_batch = np.zeros((batch_size, adj_n_time_steps, n_features)) # (batch_size, adj_n_time_steps n_features)
+    #     y_batch = np.zeros((batch_size, n_trades, n_symbols, 2)) # (batch_size, n_trades, n_symbols, 2)
+
+    #     if shuffle:
+    #         inds = np.random.choice(int_index, batch_size, replace=replace) # (batch_size,)
+    #     else:
+    #         start_ind = np.random.randint(0, len(int_index)-batch_size+1)
+    #         inds = int_index[start_ind:start_ind+batch_size] # (batch_size,)
+            
+    #     for i, random_index in enumerate(inds):
+    #         X_sample = self.X.iloc[random_index - adj_n_time_steps: random_index] # (adj_n_time_steps, n_features)
+    #         y_sample = self.y.iloc[random_index - 1] # (n_symbols,)
+    #         X_batch[i, :] = X_sample
+    #         y_batch[i] = y_sample
+        
+    #     return X_batch, y_batch
+
     def __len__(self):
         return len(self.X)
     
